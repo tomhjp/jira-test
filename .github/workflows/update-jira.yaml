@@ -1,0 +1,55 @@
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment: # Comments on the diff
+    types: [created]
+  workflow_dispatch:
+
+
+name: Sync comments from GitHub to Jira
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    name: Main
+    steps:
+    - name: Dump context
+      run: echo "$GITHUB_CONTEXT"
+      env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+    - name: Login
+      uses: atlassian/gajira-login@v2.0.0
+      env:
+        JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+        JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+        JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+    - name: Search using issue link
+      if: ${{ github.event.issue }}
+      id: search-issue
+      uses: tomhjp/gajira-search@master
+      with:
+        jql: 'project = "VAULT" and issuetype = "GH Issue" and cf[10089]="${{ github.event.issue.html_url }}"' # cf[10089] == Issue Link custom field
+    
+    - name: Search using PR link
+      if: ${{ github.event.review }}
+      id: search-pr
+      uses: tomhjp/gajira-search@master
+      with:
+        jql: 'project = "VAULT" and issuetype = "GH Issue" and cf[10089]="${{ github.event.pull_request.html_url }}"' # cf[10089] == Issue Link custom field
+
+    - name: Create Jira comment from Issue/PR comment
+      if: ${{ github.event.comment }}
+      uses: atlassian/gajira-comment@v2.0.1
+      with:
+        issue: ${{ steps.search-issue.outputs.issue }}
+        comment: "${{ github.actor }} commented:\n\n${{ github.event.comment.body }}"
+
+    - name: Create Jira comment from PR review
+      if: ${{ github.event.review }}
+      uses: atlassian/gajira-comment@v2.0.1
+      with:
+        issue: ${{ steps.search-pr.outputs.issue }}
+        comment: "${{ github.actor }} ${{ github.event.review.state }}:\n\n${{ github.event.review.body }}"
