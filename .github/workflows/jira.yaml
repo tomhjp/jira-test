@@ -70,13 +70,28 @@ jobs:
         JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
         JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
 
+    - uses: actions/github-script@v2
+    id: community-check
+    with:
+      github-token: ${{ secrets.GH_TOKEN }}
+      script: |
+        github.teams.getMembershipForUserInOrg({
+          "hashicorp",
+          "vault",
+          ${{ github.actor }}
+        })
+
+    - name: Log result
+      run: echo ${{ steps.community-check.outputs.result.role }}
+
     - name: Search
       id: search
-      uses: tomhjp/gh-action-jira-search@v0.1.1
+      uses: tomhjp/gh-action-jira-search@v0.2.0
       with:
         jql: 'project = "VAULT" and issuetype = "GH Issue" and cf[10089]="${{ github.event.issue.html_url || github.event.pull_request.html_url }}"' # cf[10089] == Issue Link custom field
 
     - name: Sync comment
+      if: steps.search.outputs.issue
       uses: atlassian/gajira-comment@v2.0.1
       with:
         issue: ${{ steps.search.outputs.issue }}
@@ -96,12 +111,13 @@ jobs:
 
     - name: Search
       id: search
-      uses: tomhjp/gh-action-jira-search@v0.1.1
+      uses: tomhjp/gh-action-jira-search@v0.2.0
       with:
         # cf[10089] == Issue Link custom field
         jql: 'project = "VAULT" and issuetype = "GH Issue" and cf[10089]="${{ github.event.issue.html_url || github.event.pull_request.html_url }}"'
 
     - name: Close ticket
+      if: steps.search.outputs.issue
       uses: atlassian/gajira-transition@v2.0.1
       with:
         issue: ${{ steps.search.outputs.issue }}
@@ -121,12 +137,13 @@ jobs:
 
     - name: Search
       id: search
-      uses: tomhjp/gh-action-jira-search@v0.1.0
+      uses: tomhjp/gh-action-jira-search@v0.2.0
       with:
         # cf[10089] == Issue Link custom field
         jql: 'project = "VAULT" and issuetype = "GH Issue" and cf[10089]="${{ github.event.issue.html_url || github.event.pull_request.html_url }}"'
 
     - name: Reopen ticket
+      if: steps.search.outputs.issue
       uses: atlassian/gajira-transition@v2.0.1
       with:
         issue: ${{ steps.search.outputs.issue }}
