@@ -24,22 +24,28 @@ jobs:
       with:
         repository: "github/hub"
       
-    - name: Check if community user
-      id: vault-team-role
-      run: |
-        TEAM=consul
-        ROLE="$(hub api orgs/hashicorp/teams/${TEAM}/memberships/${{ github.actor }} | jq -r '.role | select(.!=null)')"
-        if [[ -n ${ROLE} ]]; then
-          echo "Actor ${{ github.actor }} is a ${TEAM} team member, skipping Jira ticket creation"
-        else
-          echo "Actor ${{ github.actor }} is not a ${TEAM} team member, continuing to Jira ticket creation"
-        fi
-        echo "::set-output name=role::${ROLE}"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+    - uses: actions/github-script@v2
+      id: is-community
+      with:
+        github-token: ${{ secrets.GH_TOKEN }}
+        script: |
+          const team = "vault"
+          const username = "${{ github.actor }}"
+          const result = await github.teams.getMembershipForUserInOrg({
+            org: "hashicorp",
+            team_slug: team,
+            username: username,
+          })
+          const inVaultTeam = "role" in result.data
+          if (inVaultTeam) {
+            console.log(`${username} is a ${team} team member, skipping Jira ticket creation`)
+          } else {
+            console.log(`${username} is not a ${team} team member, continuing to ticket creation`)
+          }
+          return !inVaultTeam
 
     - name: Login
-      if: ${{ !steps.vault-team-role.outputs.role }}
+      if: steps.is-community.outputs.result == 'true'
       uses: atlassian/gajira-login@v2.0.0
       env:
         JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
@@ -47,7 +53,7 @@ jobs:
         JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
 
     - name: Create ticket
-      if: ${{ !steps.vault-team-role.outputs.role }}
+      if: steps.is-community.outputs.result == 'true'
       uses: tomhjp/gajira-create@master
       with:
         project: VAULT
@@ -69,20 +75,6 @@ jobs:
         JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
         JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
         JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-
-    - uses: actions/github-script@v2
-    id: community-check
-    with:
-      github-token: ${{ secrets.GH_TOKEN }}
-      script: |
-        github.teams.getMembershipForUserInOrg({
-          "hashicorp",
-          "vault",
-          ${{ github.actor }}
-        })
-
-    - name: Log result
-      run: echo ${{ steps.community-check.outputs.result.role }}
 
     - name: Search
       id: search
