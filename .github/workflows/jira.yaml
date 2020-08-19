@@ -19,33 +19,23 @@ jobs:
     if: (github.event_name == 'issues' || github.event_name == 'pull_request') && github.event.action == 'opened'
     runs-on: ubuntu-latest
     name: Create ticket
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        repository: "github/hub"
-      
-    - uses: actions/github-script@v2
-      id: is-community
-      with:
-        github-token: ${{ secrets.GH_TOKEN }}
-        script: |
-          const team = "vault"
-          const username = "${{ github.actor }}"
-          const result = await github.teams.getMembershipForUserInOrg({
-            org: "hashicorp",
-            team_slug: team,
-            username: username,
-          })
-          const inVaultTeam = "role" in result.data
-          if (inVaultTeam) {
-            console.log(`${username} is a ${team} team member, skipping Jira ticket creation`)
-          } else {
-            console.log(`${username} is not a ${team} team member, continuing to ticket creation`)
-          }
-          return !inVaultTeam
+    steps:      
+    - name: Check if community user
+      id: vault-team-role
+      run: |
+        TEAM=vault
+        ROLE="$(hub api orgs/hashicorp/teams/${TEAM}/memberships/${{ github.actor }} | jq -r '.role | select(.!=null)')"
+        if [[ -n ${ROLE} ]]; then
+          echo "Actor ${{ github.actor }} is a ${TEAM} team member, skipping Jira ticket creation"
+        else
+          echo "Actor ${{ github.actor }} is not a ${TEAM} team member, continuing to Jira ticket creation"
+        fi
+        echo "::set-output name=role::${ROLE}"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
     - name: Login
-      if: steps.is-community.outputs.result == 'true'
+      if: ${{ !steps.vault-team-role.outputs.role }}
       uses: atlassian/gajira-login@v2.0.0
       env:
         JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
@@ -53,16 +43,16 @@ jobs:
         JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
 
     - name: Create ticket
-      if: steps.is-community.outputs.result == 'true'
-      uses: tomhjp/gajira-create@master
+      if: ${{ !steps.vault-team-role.outputs.role }}
+      uses: tomhjp/gh-action-jira-create@v0.1.0
       with:
         project: VAULT
         issuetype: "GH Issue"
-        issuelink: ${{ github.event.issue.html_url || github.event.pull_request.html_url }}
         summary: "${{ github.repository }}: ${{ github.event.issue.title || github.event.pull_request.title }} #${{ github.event.issue.number || github.event.pull_request.number }}"
         description: "${{ github.event.issue.body || github.event.pull_request.body }}\n\n_Created from GitHub Action for ${{ github.event.issue.html_url || github.event.pull_request.html_url }}, from ${{ github.actor }}_"
-        fixversion: TBD
-        team: product
+        # customfield_10089 is issuelink
+        # customfield_10091 is team
+        extraFields: '{"fixVersions": [{"name": "TBD"}], "customfield_10091": ["product"], "customfield_10089": "${{ github.event.issue.html_url || github.event.pull_request.html_url }}"}'
   
   sync-comment:
     if: github.event.action == 'created' || github.event.action == 'submitted'
@@ -78,7 +68,7 @@ jobs:
 
     - name: Search
       id: search
-      uses: tomhjp/gh-action-jira-search@v0.2.0
+      uses: tomhjp/gh-action-jira-search@v0.2.1
       with:
         jql: 'project = "VAULT" and issuetype = "GH Issue" and cf[10089]="${{ github.event.issue.html_url || github.event.pull_request.html_url }}"' # cf[10089] == Issue Link custom field
 
@@ -103,7 +93,7 @@ jobs:
 
     - name: Search
       id: search
-      uses: tomhjp/gh-action-jira-search@v0.2.0
+      uses: tomhjp/gh-action-jira-search@v0.2.1
       with:
         # cf[10089] == Issue Link custom field
         jql: 'project = "VAULT" and issuetype = "GH Issue" and cf[10089]="${{ github.event.issue.html_url || github.event.pull_request.html_url }}"'
@@ -129,7 +119,7 @@ jobs:
 
     - name: Search
       id: search
-      uses: tomhjp/gh-action-jira-search@v0.2.0
+      uses: tomhjp/gh-action-jira-search@v0.2.1
       with:
         # cf[10089] == Issue Link custom field
         jql: 'project = "VAULT" and issuetype = "GH Issue" and cf[10089]="${{ github.event.issue.html_url || github.event.pull_request.html_url }}"'
