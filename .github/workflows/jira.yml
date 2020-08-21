@@ -1,7 +1,7 @@
 on:
   issues:
     types: [opened, closed, deleted, reopened]
-  pull_request:
+  pull_request_target:
     types: [opened, closed, reopened]
   issue_comment:
     types: [created]
@@ -16,7 +16,7 @@ name: Jira Sync
 
 jobs:
   create:
-    if: (github.event_name == 'issues' || github.event_name == 'pull_request') && github.event.action == 'opened'
+    if: (github.event_name == 'issues' || github.event_name == 'pull_request_target') && github.event.action == 'opened'
     runs-on: ubuntu-latest
     name: Create ticket
     steps:      
