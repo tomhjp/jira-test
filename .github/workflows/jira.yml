@@ -18,7 +18,7 @@ jobs:
       if: github.event.action == 'opened'
       id: vault-team-role
       run: |
-        TEAM=consul
+        TEAM=vault
         ROLE="$(hub api orgs/hashicorp/teams/${TEAM}/memberships/${{ github.actor }} | jq -r '.role | select(.!=null)')"
         if [[ -n ${ROLE} ]]; then
           echo "Actor ${{ github.actor }} is a ${TEAM} team member"
@@ -32,9 +32,9 @@ jobs:
     - name: Login
       uses: atlassian/gajira-login@v2.0.0
       env:
-        JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
-        JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
-        JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        JIRA_BASE_URL: ${{ secrets.JIRA_SYNC_BASE_URL }}
+        JIRA_USER_EMAIL: ${{ secrets.JIRA_SYNC_USER_EMAIL }}
+        JIRA_API_TOKEN: ${{ secrets.JIRA_SYNC_API_TOKEN }}
 
     - name: Create ticket
       if: github.event.action == 'opened' && !steps.vault-team-role.outputs.role
