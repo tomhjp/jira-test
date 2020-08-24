@@ -18,7 +18,7 @@ jobs:
       if: github.event.action == 'opened'
       id: vault-team-role
       run: |
-        TEAM=consul
+        TEAM=vault
         ROLE="$(hub api orgs/hashicorp/teams/${TEAM}/memberships/${{ github.actor }} | jq -r '.role | select(.!=null)')"
         if [[ -n ${ROLE} ]]; then
           echo "Actor ${{ github.actor }} is a ${TEAM} team member"
