@@ -49,7 +49,7 @@ jobs:
     - name: Create ticket
       if: github.event.action == 'opened' && !steps.vault-team-role.outputs.role
       id: create-ticket
-      uses: tomhjp/gh-action-jira-create@v0.1.2
+      uses: tomhjp/gh-action-jira-create@v0.1.3
       with:
         project: VAULT
         issuetype: "GH Issue"
