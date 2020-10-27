@@ -64,15 +64,14 @@ jobs:
           description: "$(cat body.jira)\n\n_Created from GitHub Action for ${{ github.event.issue.html_url || github.event.pull_request.html_url }} from ${{ github.actor }}_"
           # customfield_10089 is Issue Link custom field
           # customfield_10091 is team custom field
-          extraFields: '{"fixVersions": [{"name": "TBD"}], "customfield_10091": ["product"], "customfield_10089": "${{ github.event.issue.html_url || github.event.pull_request.html_url }}"}'
+          #extraFields: '{"fixVersions": [{"name": "TBD"}], "customfield_10091": ["product"], "customfield_10089": "${{ github.event.issue.html_url || github.event.pull_request.html_url }}"}'
 
       - name: Search
         if: github.event.action != 'opened'
         id: search
         uses: tomhjp/gh-action-jira-search@v0.2.1
         with:
-          # cf[10089] is Issue Link custom field
-          jql: 'project = "VAULT" and issuetype = "GH Issue" and cf[10089]="${{ github.event.issue.html_url || github.event.pull_request.html_url }}"'
+          jql: 'description ~ "https://github.com/tomhjp/jira-test/issues/24"'
 
       - name: Sync comment
         if: github.event.action == 'created' && steps.search.outputs.issue
