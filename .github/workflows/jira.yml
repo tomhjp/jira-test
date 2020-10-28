@@ -44,13 +44,17 @@ jobs:
           else
             echo "::set-output name=type::ISS"
           fi
-          cat <<"EOF" | docker run -i --rm pandoc/core:2.11.0.4 --from gfm --to jira > body.jira
+          BODY="$(cat <<"EOF" | docker run -i --rm pandoc/core:2.11.0.4 --from gfm --to jira | awk '{printf "%s\\n", $0}'
           ${{ github.event.issue.body || github.event.pull_request.body }}
           EOF
+          )"
           if ${{ github.event.action == 'opened' }}; then
-              printf "\n\n_Created from GitHub Action for ${{ github.event.issue.html_url || github.event.pull_request.html_url }} from ${{ github.actor }}_" >> body.jira
+              BODY+="\n\n_Created from GitHub Action for ${{ github.event.issue.html_url || github.event.pull_request.html_url }} from ${{ github.actor }}_" >> body.jira
           fi
-          echo "::set-output name=body::`pwd`/body.jira"
+          BODY="${BODY//'%'/'%25'}"
+          BODY="${BODY//$'\n'/'%0A'}"
+          BODY="${BODY//$'\r'/'%0D'}"
+          echo "::set-output name=body::${BODY}"
       - name: Create ticket
         if: github.event.action == 'opened' && !steps.vault-team-role.outputs.role
         uses: tomhjp/gh-action-jira-create@add-description-file-parameter
@@ -58,7 +62,7 @@ jobs:
           project: VAULT
           issuetype: "GH Issue"
           summary: "${{ github.event.repository.name }} [${{ steps.preprocess.outputs.type }} #${{ github.event.issue.number || github.event.pull_request.number }}]: ${{ github.event.issue.title || github.event.pull_request.title }}"
-          description_file: "${{ steps.preprocess.outputs.body }}"
+          description: "${{ steps.preprocess.outputs.body }}"
           # customfield_10089 is Issue Link custom field
           # customfield_10091 is team custom field
           #extraFields: '{"fixVersions": [{"name": "TBD"}], "customfield_10091": ["product"], "customfield_10089": "${{ github.event.issue.html_url || github.event.pull_request.html_url }}"}'
