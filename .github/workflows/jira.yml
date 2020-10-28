@@ -44,12 +44,12 @@ jobs:
           else
             echo "::set-output name=type::ISS"
           fi
-          BODY="$(cat <<"EOF" | docker run -i --rm pandoc/core:2.11.0.4 --from gfm --to jira | awk '{printf "%s\\n", $0}'
+          BODY="$(cat <<"EOF" | docker run -i --rm pandoc/core:2.11.0.4 --from gfm --to jira | xargs -0 printf "%s"
           ${{ github.event.issue.body || github.event.pull_request.body }}
           EOF
           )"
           if ${{ github.event.action == 'opened' }}; then
-              BODY+="\n\n_Created from GitHub Action for ${{ github.event.issue.html_url || github.event.pull_request.html_url }} from ${{ github.actor }}_" >> body.jira
+              BODY+="$(printf "\n\n_Created from GitHub Action for ${{ github.event.issue.html_url || github.event.pull_request.html_url }} from ${{ github.actor }}_")"
           fi
           BODY="${BODY//'%'/'%25'}"
           BODY="${BODY//$'\n'/'%0A'}"
