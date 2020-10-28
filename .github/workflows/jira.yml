@@ -44,16 +44,14 @@ jobs:
           else
             echo "::set-output name=type::ISS"
           fi
-          BODY="$(cat <<"EOF" | docker run -i --rm pandoc/core:2.11.0.4 --from gfm --to jira | xargs -0 printf "%s"
+
+          # Run GitHub flavored (gfm) markdown through pandoc to convert to jira markdown
+          # Then replace newlines with %0A so that newlines get preserved when storing in the step output
+          # The %0A will then get expanded back to real new lines when the output is included in a later step inside ${{}} syntax
+          BODY="$(cat <<"EOF" | docker run -i --rm pandoc/core:2.11.0.4 --from gfm --to jira | awk '{printf "%s%%0A", $0}'
           ${{ github.event.issue.body || github.event.pull_request.body }}
           EOF
           )"
-          if ${{ github.event.action == 'opened' }}; then
-              BODY+="$(printf "\n\n_Created from GitHub Action for ${{ github.event.issue.html_url || github.event.pull_request.html_url }} from ${{ github.actor }}_")"
-          fi
-          BODY="${BODY//'%'/'%25'}"
-          BODY="${BODY//$'\n'/'%0A'}"
-          BODY="${BODY//$'\r'/'%0D'}"
           echo "::set-output name=body::${BODY}"
       - name: Create ticket
         if: github.event.action == 'opened' && !steps.vault-team-role.outputs.role
@@ -62,7 +60,7 @@ jobs:
           project: VAULT
           issuetype: "GH Issue"
           summary: "${{ github.event.repository.name }} [${{ steps.preprocess.outputs.type }} #${{ github.event.issue.number || github.event.pull_request.number }}]: ${{ github.event.issue.title || github.event.pull_request.title }}"
-          description: "${{ steps.preprocess.outputs.body }}"
+          description: "${{ steps.preprocess.outputs.body }}\n\n_Created from GitHub Action for ${{ github.event.issue.html_url || github.event.pull_request.html_url }} from ${{ github.actor }}_"
           # customfield_10089 is Issue Link custom field
           # customfield_10091 is team custom field
           #extraFields: '{"fixVersions": [{"name": "TBD"}], "customfield_10091": ["product"], "customfield_10089": "${{ github.event.issue.html_url || github.event.pull_request.html_url }}"}'
@@ -79,7 +77,7 @@ jobs:
         uses: tomhjp/gh-action-jira-comment@v0.1.0
         with:
           issue: ${{ steps.search.outputs.issue }}
-          comment: "${{ github.actor }} ${{ github.event.review.state || 'commented' }}:\n\n${{ github.event.comment.body || github.event.review.body }}\n\n${{ github.event.comment.html_url || github.event.review.html_url }}"
+          comment: "${{ github.actor }} ${{ github.event.review.state || 'commented' }}:\n\n${{ steps.preprocess.outputs.body }}\n\n${{ github.event.comment.html_url || github.event.review.html_url }}"
 
       - name: Close ticket
         if: (github.event.action == 'closed' || github.event.action == 'deleted') && steps.search.outputs.issue
