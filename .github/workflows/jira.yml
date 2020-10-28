@@ -49,13 +49,13 @@ jobs:
           # Then replace newlines with %0A so that newlines get preserved when storing in the step output
           # The %0A will then get expanded back to real new lines when the output is included in a later step inside $ {{}} syntax
           BODY="$(cat <<"EOF" | docker run -i --rm pandoc/core:2.11.0.4 --from gfm --to jira | awk '{printf "%s%%0A", $0}'
-          ${{ github.event.issue.body || github.event.pull_request.body }}
+          ${{ github.event.comment.body || github.event.review.body || github.event.issue.body || github.event.pull_request.body }}
           EOF
           )"
           echo "::set-output name=body::${BODY}"
       - name: Create ticket
         if: github.event.action == 'opened' && !steps.vault-team-role.outputs.role
-        uses: tomhjp/gh-action-jira-create@add-description-file-parameter
+        uses: tomhjp/gh-action-jira-create@master
         with:
           project: VAULT
           issuetype: "GH Issue"
@@ -74,7 +74,7 @@ jobs:
 
       - name: Sync comment
         if: github.event.action == 'created' && steps.search.outputs.issue
-        uses: tomhjp/gh-action-jira-comment@v0.1.0
+        uses: tomhjp/gh-action-jira-comment@master
         with:
           issue: ${{ steps.search.outputs.issue }}
           comment: "${{ github.actor }} ${{ github.event.review.state || 'commented' }}:\n\n${{ steps.preprocess.outputs.body }}\n\n${{ github.event.comment.html_url || github.event.review.html_url }}"
